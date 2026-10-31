@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Cầu An - Chánh Điện Đỉnh Cao</title>
+    <style>
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 1080px;
+            height: 1920px;
+            overflow: hidden;
+            background: #150b05;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Cố định khung chứa đúng chuẩn dọc 9:16 tuyệt đối cho Live */
+        #app-container {
+            position: relative;
+            width: 1080px;
+            height: 1920px;
+            overflow: hidden;
+        }
+        /* Canvas vẽ cảnh chánh điện và hiệu ứng hoa sen rơi / khói trầm */
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1080px;
+            height: 1920px;
+            z-index: 1;
+        }
+        /* Lớp giao diện UI đè lên trên */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1080px;
+            height: 1920px;
+            z-index: 2;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 60px 40px;
+        }
+        .top-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+        .header-title {
+            color: #ffd700;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 25px;
+            border-radius: 15px;
+            border: 2px solid #d4af37;
+        }
+        /* Bảng Xếp Hạng Tấm Lòng Thành (Góc phải) */
+        .leaderboard {
+            background: rgba(20, 15, 10, 0.85);
+            border: 2px solid #d4af37;
+            border-radius: 15px;
+            padding: 15px;
+            width: 320px;
+            color: #fff;
+        }
+        .lb-title { color: #ffd700; font-size: 22px; font-weight: bold; margin-bottom: 10px; text-align: center; }
+        .lb-item { font-size: 18px; margin: 8px 0; display: flex; justify-content: space-between; color: #ffeb3b; }
+
+        /* Khung hiển thị dòng bình luận trôi nổi (Chat Ticker) ở giữa */
+        #chat-stream {
+            position: absolute;
+            top: 900px;
+            left: 40px;
+            width: 1000px;
+            height: 450px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .chat-bubble {
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 6px solid #00ffcc;
+            padding: 14px 22px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 26px;
+            width: fit-content;
+            animation: fadeIn 0.3s ease-out;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .chat-user { color: #00ffcc; font-weight: bold; margin-right: 10px; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hộp hiển thị kết quả Xăm / Quà tặng lớn ở dưới */
+        #xam-box {
+            background: rgba(20, 20, 20, 0.95);
+            border: 3px solid #ffcc00;
+            border-radius: 25px;
+            padding: 40px;
+            color: #fff;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(255, 204, 0, 0.7);
+            opacity: 0;
+            transition: opacity 0.4s ease-in-out;
+            margin-bottom: 80px;
+        }
+        .user-name { color: #00ffcc; font-size: 40px; font-weight: bold; }
+        .qu-type { font-size: 32px; font-weight: bold; margin: 15px 0; }
+        .qu-text { color: #ffeb3b; font-size: 28px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- Canvas vẽ cảnh chánh điện, hào quang, phật tử và hiệu ứng hoa sen rơi -->
+        <canvas id="gameCanvas" width="1080" height="1920"></canvas>
+
+        <!-- Giao diện UI -->
+        <div id="ui-layer">
+            <div class="top-section">
+                <div class="header-title">🙏 THÁNH ĐIỆN CẦU AN - PHƯỚC LỘC 🙏</div>
+                
+                <!-- Bảng Xếp Hạng Tấm Lòng Thành -->
+                <div class="leaderboard">
+                    <div class="lb-title">🏆 TẤM LÒNG THÀNH</div>
+                    <div class="lb-item"><span>1. 👑 Đạo Hữu Minh Tâm</span><span>388 xu</span></div>
+                    <div class="lb-item"><span>2. 🌸 Gia Hân</span><span>260 xu</span></div>
+                    <div class="lb-item"><span>3. 🪷 Tâm Không</span><span>188 xu</span></div>
+                </div>
+            </div>
+
+            <!-- Khung chứa bình luận trôi nổi real-time -->
+            <div id="chat-stream"></div>
+
+            <!-- Hộp thỉnh xăm / thông báo quà tặng -->
+            <div id="xam-box">
+                <h2 id="box-title" style="margin:0; color: #ffcc00; font-size: 38px;">✨ THỈNH XĂM CẦU AN ✨</h2>
+                <p>Gia chủ: <span id="lbl-user" class="user-name">Đang thỉnh...</span></p>
+                <div id="lbl-type" class="qu-type" style="color: #ff9900;">--</div>
+                <div id="lbl-qu" class="qu-text">Thành tâm hướng thiện, vạn sự hanh thông</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Danh sách Phật tử và Nhà sư di chuyển dưới chánh điện
+        let characters = [
+            { x: 250, y: 1600, speed: 0.6, type: 'phattu', direction: 1, text: 'Nam Mô A Di Đà Phật' },
+            { x: 800, y: 1700, speed: 0.4, type: 'su', direction: -1, text: 'Thiện tai, thiện tai...' },
+            { x: 500, y: 1550, speed: 0.5, type: 'phattu', direction: 1, text: 'Cầu bình an gia đạo' }
+        ];
+
+        // Hiệu ứng cánh hoa sen rơi từ trên xuống
+        let lotusPetals = [];
+        for(let i=0; i<30; i++) {
+            lotusPetals.push({
+                x: Math.random() * 1080,
+                y: Math.random() * 1920,
+                size: Math.random() * 15 + 10,
+                speedY: Math.random() * 1.5 + 0.8,
+                speedX: Math.sin(i) * 0.8,
+                rotation: Math.random() * 360
+            });
+        }
+
+        function drawScene() {
+            let gradient = ctx.createLinearGradient(0, 0, 0, 1920);
+            gradient.addColorStop(0, '#1c1008');
+            gradient.addColorStop(0.5, '#3d2314');
+            gradient.addColorStop(1, '#150b05');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.18)';
+            ctx.beginPath();
+            ctx.arc(540, 450, 380, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.beginPath();
+            ctx.arc(540 + Math.sin(Date.now() / 1000) * 50, 700 - (Date.now() / 25) % 500, 75, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 182, 193, 0.8)';
+            lotusPetals.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, p.size, p.size / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                p.y += p.speedY;
+                p.x += p.speedX;
+                p.rotation += 0.01;
+
+                if (p.y > 1920) { p.y = -50; p.x = Math.random() * 1080; }
+            });
+
+            characters.forEach(char => {
+                ctx.save();
+                ctx.translate(char.x, char.y);
+
+                ctx.fillStyle = (char.type === 'su') ? '#ff8c00' : '#8b0000';
+                ctx.fillRect(-25, -70, 50, 100);
+
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(0, -90, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                ctx.fillRect(-100, -150, 200, 45);
+                ctx.strokeStyle = '#d4af37';
+                ctx.strokeRect(-100, -150, 200, 45);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(char.text, 0, -122);
+
+                ctx.restore();
+
+                char.x += char.speed * char.direction;
+                if (char.x > 900 || char.x < 180) {
+                    char.direction *= -1;
+                }
+            });
+
+            requestAnimationFrame(drawScene);
+        }
+        drawScene();
+
+        // Kho dữ liệu quẻ xăm đa dạng
+        const khoDuLieuXam = {
+            cauan: [
+                { type: "🌟 CẦU AN BÌNH AN (Thượng Cát)", text: "Gia đạo thuận hòa, tâm thanh tịnh, tai qua nạn khỏi, phước lộc tự khắc tề tựu." },
+                { type: "🌟 CẦU AN GIA ĐẠO (Thượng Thượng)", text: "Trên dưới một lòng, nhà cửa êm ấm, mùa màng bội thu, vạn sự bình an vô sự." }
+            ],
+            tinhduyen: [
+                { type: "💖 TÌNH DUYÊN (Thượng Thượng)", text: "Hoa nở mùa xuân, đôi lứa tri kỷ, duyên lành đưa lối, sớm ngày chung đôi vẹn tròn." },
+                { type: "⚠️ TÌNH DUYÊN (Hạ Hạ)", text: "Cẩn trọng lời ăn tiếng nói trong tình cảm, tránh ghen tuông vô cớ mà lỡ dở tơ duyên." }
+            ],
+            sunghiep: [
+                { type: "📈 SỰ NGHIỆP / CÔNG DANH (Thượng Thượng)", text: "Cá chép hoá rồng, thăng quan tiến chức, gặp quý nhân phù trợ, mưu sự đại thành." },
+                { type: "📉 SỰ NGHIỆP (Hạ Hạ - Nhắc Nhở)", text: "Đường công danh trắc trở tạm thời, chớ nên đầu tư mạo hiểm, thủ thế an toàn là thượng sách." }
+            ],
+            khaitruong: [
+                { type: "🚀 KHAI TRƯƠNG / KINH DOANH (Thượng Thượng)", text: "Buôn may bán đắt, tiền vô như nước sông Tiền, khách vào nườm nượp, phát tài phát lộc!" }
+            ]
+        };
+
+        // Thêm bình luận vào khung Chat Ticker
+        function hienThiBinhLuanChat(username, message) {
+            const chatStream = document.getElementById('chat-stream');
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.innerHTML = `<span class="chat-user">${username}:</span> ${message}`;
+            chatStream.appendChild(bubble);
+
+            if (chatStream.children.length > 6) {
+                chatStream.removeChild(chatStream.firstChild);
+            }
+        }
+
+        // Hàng đợi xử lý tương tác & Quà tặng
+        let waitingQueue = [];
+        let isProcessing = false;
+
+        function nhanTuongTac(username, keyword, isGift, giftName = "") {
+            hienThiBinhLuanChat(username, giftName ? `Đã cúng dường [${giftName}] 🌸` : keyword);
+
+            let data = { name: username, kw: keyword.toLowerCase().trim(), isGift: isGift, gift: giftName };
+            if (isGift) {
+                waitingQueue.unshift(data);
+            } else {
+                waitingQueue.push(data);
+            }
+            if (!isProcessing) xuLyHangDoi();
+        }
+
+        function xuLyHangDoi() {
+            if (waitingQueue.length === 0) {
+                isProcessing = false;
+                return;
+            }
+            isProcessing = true;
+            let current = waitingQueue.shift();
+
+            let danhSachChon = khoDuLieuXam.cauan;
+            let tieuDeBox = "✨ THỈNH XĂM CẦU AN ✨";
+
+            if (current.isGift) {
+                tieuDeBox = `🪷 CẢM TẠ TỊNH TÀI (${current.gift}) 🪷`;
+            } else if (current.kw.includes('tinhduyen') || current.kw.includes('duyen')) {
+                danhSachChon = khoDuLieuXam.tinhduyen;
+                tieuDeBox = "💖 QUẺ XĂM TÌNH DUYÊN 💖";
+            } else if (current.kw.includes('sunghiep') || current.kw.includes('congdanh')) {
+                danhSachChon = khoDuLieuXam.sunghiep;
+                tieuDeBox = "📈 QUẺ XĂM CÔNG DANH 📈";
+            } else if (current.kw.includes('khaitruong') || current.kw.includes('buonmay')) {
+                danhSachChon = khoDuLieuXam.khaitruong;
+                tieuDeBox = "🚀 GIEO QUẺ KHAI TRƯƠNG 🚀";
+            }
+
+            let quChon = danhSachChon[Math.floor(Math.random() * danhSachChon.length)];
+
+            const box = document.getElementById('xam-box');
+            document.getElementById('box-title').innerText = tieuDeBox;
+            document.getElementById('lbl-user').innerText = current.name;
+            document.getElementById('lbl-type').innerText = current.isGift ? "🌟 ƯU TIÊN PHƯỚC LỘC VIÊN MÃN 🌟" : quChon.type;
+            document.getElementById('lbl-qu').innerText = current.isGift ? "Đạo hữu thành tâm cúng dường tịnh tài, tâm nguyện sở cầu như ý phát tài!" : quChon.text;
+            box.style.opacity = '1';
+
+            let loiThoai = current.isGift 
+                ? `Nam mô A Di Đà Phật. Thầy vô cùng cảm tạ đạo hữu ${current.name} đã cúng dường ${current.gift}. Nguyện cầu gia đạo bình an, tài lộc hưng vượng!`
+                : `Nam mô A Di Đà Phật. Thầy xin hồi đáp cho con ${current.name}. Quẻ của con là ${quChon.type}. ${quChon.text}`;
+            
+            docGiongMienNam(loiThoai);
+
+            setTimeout(() => {
+                box.style.opacity = '0';
+                setTimeout(xuLyHangDoi, 1000);
+            }, 8000);
+        }
+
+        function docGiongMienNam(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'vi-VN';
+                utterance.pitch = 0.95;
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // ==========================================
+        // KẾT NỐI WEBSOCKET NHẬN CHAT THẬT TỪ TIKTOK LIVE
+        // ==========================================
+        try {
+            let ws = new WebSocket('ws://localhost:8888');
+            
+            ws.onmessage = function(event) {
+                let packet = JSON.parse(event.data);
+                
+                if (packet.type === 'chat') {
+                    let user = packet.uniqueId;
+                    let text = packet.comment;
+                    
+                    if (text.includes('cauan') || text.includes('tinhduyen') || text.includes('sunghiep') || text.includes('khaitruong') || text.includes('binhan')) {
+                        nhanTuongTac(user, text, false);
+                    } else {
+                        hienThiBinhLuanChat(user, text);
+                    }
+                }
+                
+                if (packet.type === 'gift' && packet.repeatEnd) {
+                    let user = packet.uniqueId;
+                    let giftName = packet.giftName;
+                    nhanTuongTac(user, "tangqua", true, giftName);
+                }
+            };
+            
+            ws.onopen = function() {
+                console.log("Đã kết nối thành công với cổng dữ liệu TikTok Live!");
+            };
+        } catch (e) {
+            console.log("Chưa bật tool kết nối WebSocket, chạy chế độ giả lập.");
+            setTimeout(() => { nhanTuongTac("Minh Tâm", "cauan", false); }, 2000);
+            setTimeout(() => { nhanTuongTac("Gia Hân", "Hoa Sen Ngũ Sắc", true, "Hoa Sen Ngũ Sắc"); }, 7000);
+        }
+    </script>
+</body>
+</html>
